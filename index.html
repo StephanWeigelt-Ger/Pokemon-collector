@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Pokémon-Collector</title>
+  <meta name="theme-color" content="#2a52b0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Pokémon-Collector">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/basis.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <a href="#/" class="brand"><img src="icons/favicon.png" alt=""><span>Pokémon-Collector</span></a>
+    <div class="topbar-actions">
+      <button id="syncBtn" class="icon-btn" title="Synchronisieren" aria-label="Synchronisieren"><span id="syncIcon">⟳</span></button>
+      <a href="#/einstellungen" class="icon-btn" title="Einstellungen" aria-label="Einstellungen">⚙︎</a>
+    </div>
+  </header>
+  <div id="syncBar" class="sync-bar" hidden></div>
+  <div id="weeklyBar" class="sync-bar" hidden></div>
+  <main id="app" class="container"></main>
+  <div id="toast" class="toast" hidden></div>
+  <script src="vendor/xlsx.full.min.js" defer></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

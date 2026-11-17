@@ -1,0 +1,32 @@
+/* Pokémon-Collector: baut auf dem Grundstil (css/basis.css) auf, eigene Farben. */
+:root {
+  --bg: #f4f6fb;
+  --accent: #2a52b0;
+  --yellow: #ffcb05;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #14161c; --card: #1f222b; --line: #313543; --accent: #6b8fe8; }
+}
+.brand img { border-radius: 50%; }
+.detail-head.is-card .hero { height: 224px; }
+@media (max-width: 600px) { .detail-head.is-card .hero { height: 340px; } }
+
+/* Suchtreffer beim Anlegen einer Karte */
+.hits { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-top: 12px; }
+.hit {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; cursor: pointer;
+  background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px; font: inherit; color: var(--text);
+}
+.hit:hover { border-color: var(--accent); }
+.hit img, .hit .noimg { width: 100%; aspect-ratio: 245 / 342; object-fit: contain; border-radius: 6px; }
+.hit .noimg { display: flex; align-items: center; justify-content: center; font-size: 36px; }
+.hit b { font-size: 14px; line-height: 1.2; }
+.hit span { font-size: 12px; color: var(--muted); }
+
+/* Filter in der Übersicht: auf dem Handy zwei nebeneinander */
+@media (max-width: 600px) { .container > .row select { flex: 1 1 140px; max-width: none !important; } }
+
+.cmHits { display: grid; gap: 6px; margin-top: 8px; max-height: 320px; overflow: auto; }
+.cm-hit { text-align: left; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font: inherit; color: var(--text); cursor: pointer; }
+.cm-hit span { display: block; font-size: 12px; color: var(--muted); }
+.cm-hit.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
