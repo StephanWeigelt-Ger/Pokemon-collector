@@ -2,7 +2,7 @@
 
 Web-App (PWA) zur Verwaltung einer Pokémon-Sammlung: Einzelkarten (auch gegradet) und versiegelte Produkte, Einkaufspreise je Exemplar, Zustand, eigene Fotos, Marktwert von Cardmarket.
 
-- Adresse: https://stephanweigelt-ger.github.io/pokemon-collector/
+- Adresse: https://stephanweigelt-ger.github.io/Pokemon-collector/
 - Läuft auf iPhone, iPad und PC; über „Zum Home-Bildschirm“ als App installierbar.
 - Daten liegen auf dem Gerät (IndexedDB) und werden über Dropbox (App-Ordner, Unterordner `pokemon/`) zwischen Geräten abgeglichen. Anmeldung per Code, keine Weiterleitungs-Adresse nötig.
 - `data/katalog.json`: alle Sets und Karten von TCGdex (Deutsch/Englisch).
