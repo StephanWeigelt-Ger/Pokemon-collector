@@ -86,6 +86,39 @@ export async function searchCards(query, { language = 'Deutsch', setId = '', lim
   return out.slice(0, limit);
 }
 
+// Set-Info (Name, Serie, offizielle Anzahl …) für eine Set-ID
+export async function getSet(setId) {
+  return setInfo(await catalog(), setId);
+}
+
+// Komplette Kartenliste eines Sets (Set-Checkliste), sortiert nach Nummer.
+// Bevorzugt die gewünschte Sprache, sonst Deutsch, sonst Englisch.
+let setIndex = null;
+async function cardsBySet() {
+  const c = await catalog();
+  if (setIndex && setIndex.c === c) return setIndex.map;
+  const map = {};
+  for (const lang of Object.keys(c.cards || {})) {
+    for (const [id, localId, name, hasImg] of c.cards[lang]) {
+      const sid = id.slice(0, id.length - String(localId).length - 1);
+      ((map[sid] ||= {})[lang] ||= []).push([id, localId, name, hasImg]);
+    }
+  }
+  setIndex = { c, map };
+  return map;
+}
+
+export async function setCards(setId, language = 'Deutsch') {
+  const c = await catalog();
+  const bySet = (await cardsBySet())[setId] || {};
+  const lang = [langCode(language), 'de', 'en'].find((l) => bySet[l]?.length);
+  if (!lang) return { set: setInfo(c, setId), lang: '', cards: [] };
+  const s = setInfo(c, setId) || { id: setId };
+  const cards = bySet[lang].map(([id, localId, name, hasImg]) => ({ id, localId, name, image: hasImg ? imageUrl(lang, s.serieId, setId, localId) : '' }))
+    .sort((a, b) => String(a.localId).localeCompare(String(b.localId), 'de', { numeric: true }));
+  return { set: setInfo(c, setId), lang, cards };
+}
+
 // Karte über Set + Nummer finden
 export async function findCard(setId, number, language = 'Deutsch') {
   const c = await catalog();

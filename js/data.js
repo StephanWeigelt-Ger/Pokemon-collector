@@ -63,6 +63,19 @@ export async function saveSettings(values) {
   scheduleSync(500);
 }
 
+// Set-Checklisten: von Hand als vorhanden markierte Karten je Set ({ marks: { kartenId: true }, updatedAt })
+export function getChecklist(setId) { return collection.checklists?.[setId]?.marks || {}; }
+export function allChecklists() { return collection.checklists || {}; }
+export async function toggleChecklistMark(setId, cardId) {
+  const marks = { ...getChecklist(setId) };
+  if (marks[cardId]) delete marks[cardId]; else marks[cardId] = true;
+  collection.checklists = { ...(collection.checklists || {}), [setId]: { marks, updatedAt: now() } };
+  collection.updatedAt = now();
+  await kv.set('collection', collection);
+  emit();
+  scheduleSync(800);
+}
+
 export function exportJson() { return JSON.stringify(collection, null, 2); }
 
 export async function replaceAll(data) {
