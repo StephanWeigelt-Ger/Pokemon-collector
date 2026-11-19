@@ -96,6 +96,7 @@ function renderList() {
     return [s.name, s.pokemon, s.setName, s.number, s.rarity, s.productType, s.language, s.notes, ...s.copies.map((c) => [c.damage, c.location, c.shop, c.variant, c.grader, c.certNumber].join(' '))].join(' ').toLowerCase().includes(q);
   });
   list = sortItems(list, ui.sort);
+  const filterSetId = ui.set ? itemSetId(items.find((s) => isCard(s) && s.setName === ui.set && itemSetId(s)) || {}) : '';
 
   app.innerHTML = `
     <div class="stats">
@@ -113,6 +114,7 @@ function renderList() {
         ${[['setName', 'Setname (A–Z)'], ['pokemon', 'Pokémon (A–Z)'], ['set', 'Set nach Erscheinung'], ['name', 'Kartenname'], ['date', 'Erscheinung (neueste)'], ['value', 'Marktwert'], ['updated', 'Zuletzt geändert']]
           .map(([v, l]) => `<option value="${v}" ${ui.sort === v ? 'selected' : ''}>${l}</option>`).join('')}
       </select>
+      <a class="btn" href="#/sets">📋 Set-Listen</a>
       <a class="btn primary" href="#/neu">＋ Neu</a>
     </div>
     <div class="row" style="margin-bottom:14px">
@@ -126,6 +128,7 @@ function renderList() {
           .map(([v, l]) => `<option value="${v}" ${ui.show === v ? 'selected' : ''}>${l}</option>`).join('')}
       </select>
       <span class="muted small">${list.length} von ${items.length}</span>
+      ${ui.set && filterSetId ? `<a class="btn small" href="#/set/${encodeURIComponent(filterSetId)}">📋 Set-Liste „${esc(ui.set)}“</a>` : ''}
     </div>
     ${list.length ? `<div class="set-list">${list.map(itemRow).join('')}</div>` : `
       <div class="empty">${items.length ? 'Keine Treffer.' : 'Noch nichts erfasst.<br><br><a class="btn primary" href="#/neu">Erste Karte oder erstes Produkt anlegen</a> <a class="btn" href="#/einstellungen">Excel-Liste importieren</a>'}</div>`}
@@ -367,6 +370,7 @@ function renderItem(id) {
           <a class="btn small" href="${research.cardmarketUrl(s)}" target="_blank" rel="noopener">Cardmarket ↗</a>
           ${!card ? `<a class="btn small" href="https://www.google.de/search?q=${encodeURIComponent('UVP ' + title(s) + ' ' + (s.setName || '') + ' Pokémon ' + (s.language || ''))}" target="_blank" rel="noopener">UVP suchen ↗</a>` : ''}
         </div>
+        ${card && itemSetId(s) ? '<div id="setBox" style="margin-top:10px"></div>' : ''}
         ${r ? `<p class="muted small">Letzte Recherche: ${new Date(r.at).toLocaleString('de-DE')} (${esc(r.source)})${r.message ? ' – ' + esc(r.message) : ''}${s.marketUpdated ? ' · Preisstand ' + dateDe(s.marketUpdated) : ''}</p>` : ''}
       </div>
     </div>
@@ -419,6 +423,11 @@ function renderItem(id) {
       return `<div class="photo" data-photo="${p.id}"><img src="${p.thumb}" alt="">${ci >= 0 ? `<span class="tag">Exemplar ${ci + 1}</span>` : ''}</div>`;
     }).join('')}</div>
   `;
+  if (card && itemSetId(s)) setProgress(itemSetId(s)).then((p) => {
+    const box = $('#setBox');
+    if (!box || !p.total) return;
+    box.innerHTML = `<a class="btn small" href="#/set/${encodeURIComponent(itemSetId(s))}">📋 Set-Liste „${esc(setTitle(p.set, ''))}“: ${p.have} von ${p.total} vorhanden · ${p.missing ? p.missing + ' fehlen' : 'komplett!'}</a>`;
+  });
   research.allSets().then((sets) => { const dl = $('#setList'); if (dl) dl.innerHTML = allSetNames(sets).map((n) => `<option value="${esc(n)}">`).join(''); });
 
   $$('[data-f]').forEach((el) => {
@@ -531,6 +540,130 @@ function copyCard(s, c, i) {
       <label class="field" style="margin-top:10px"><span>Notizen zum Exemplar</span><textarea ${cf('notes')}>${esc(c.notes)}</textarea></label>
     </details>
   </div>`;
+}
+
+// ---------- Set-Checklisten ----------
+// Vollständige Kartenliste eines Sets aus dem Katalog. Karten aus der Sammlung werden automatisch
+// abgehakt; weitere Karten lassen sich von Hand markieren (wird über Dropbox abgeglichen).
+function itemSetId(s) { return s.setId || (s.tcgdexId ? s.tcgdexId.replace(/-[^-]+$/, '') : ''); }
+
+// Status jeder Karte eines Sets: Sammlung (Einträge), Wunschliste, von Hand markiert
+function checklistStatus(setId, cards) {
+  const byNum = {};
+  for (const c of cards) byNum[normalizeCardNumber(c.localId)] = c;
+  const st = {};
+  for (const c of cards) st[c.id] = { items: [], owned: false, wish: false, marked: false };
+  for (const s of data.all()) {
+    if (!isCard(s) || itemSetId(s) !== setId) continue;
+    const c = cards.find((x) => x.id === s.tcgdexId) || byNum[normalizeCardNumber(s.number)];
+    if (!c) continue;
+    st[c.id].items.push(s);
+    if (s.wishlist) st[c.id].wish = true;
+    else if (activeCopies(s).length) st[c.id].owned = true;
+  }
+  const marks = data.getChecklist(setId);
+  for (const id of Object.keys(marks)) if (st[id]) st[id].marked = true;
+  return st;
+}
+
+async function setProgress(setId) {
+  const { set, lang, cards } = await research.setCards(setId);
+  const st = checklistStatus(setId, cards);
+  const has = (c) => st[c.id].owned || st[c.id].marked;
+  const official = set?.official || 0;
+  const main = official ? cards.filter((c) => /^\d+$/.test(c.localId) && parseInt(c.localId, 10) <= official) : [];
+  const have = cards.filter(has).length;
+  return { setId, set, lang, cards, st, has, total: cards.length, have, missing: cards.length - have,
+    mainTotal: main.length, mainMissing: main.filter((c) => !has(c)).length };
+}
+
+const setTitle = (set, id) => (set ? set.nameDe || set.nameEn : '') || id;
+
+function progressBar(have, total) {
+  const pct = total ? Math.round((have / total) * 100) : 0;
+  return `<div class="progress" title="${pct} %"><div style="width:${pct}%"></div></div>`;
+}
+
+// Übersicht aller Sets, aus denen Karten in der Sammlung sind
+async function renderSets() {
+  const ids = new Set(data.all().filter(isCard).map(itemSetId).filter(Boolean));
+  for (const [sid, cl] of Object.entries(data.allChecklists())) if (Object.keys(cl?.marks || {}).length) ids.add(sid);
+  const rows = (await Promise.all([...ids].map(setProgress))).filter((p) => p.total);
+  rows.sort((a, b) => (b.set?.releaseDate || '').localeCompare(a.set?.releaseDate || ''));
+  const sets = await research.allSets();
+  if (!location.hash.startsWith('#/sets')) return;
+  app.innerHTML = `
+    <div class="row" style="margin-bottom:8px"><a href="#/" class="btn small">← Übersicht</a></div>
+    <h1>Set-Listen</h1>
+    <p class="muted small">Alle Sets, aus denen du Karten hast, mit Fortschritt und Anzahl der fehlenden Karten. Antippen öffnet die komplette Kartenliste des Sets.</p>
+    ${rows.length ? `<div class="set-list">${rows.map((p) => `<a class="set-item cl-row" href="#/set/${encodeURIComponent(p.setId)}">
+      <div class="thumb">📋</div>
+      <div>
+        <div class="title">${esc(setTitle(p.set, p.setId))}</div>
+        <div class="meta">${[p.set?.serie, p.set?.releaseDate ? p.set.releaseDate.slice(0, 4) : ''].filter(Boolean).map(esc).join(' · ')}</div>
+        ${progressBar(p.have, p.total)}
+        <div class="badges"><span class="badge ok">${p.have} von ${p.total}</span><span class="badge ${p.missing ? 'warn' : 'ok'}">${p.missing ? p.missing + ' fehlen' : 'komplett'}</span>
+          ${p.mainTotal && p.mainTotal < p.total ? `<span class="badge">Hauptset: ${p.mainMissing ? p.mainMissing + ' fehlen' : 'komplett'}</span>` : ''}</div>
+      </div></a>`).join('')}</div>`
+      : `<div class="empty">Noch keine Karten mit bekanntem Set in der Sammlung.</div>`}
+    <h2>Andere Set-Liste öffnen</h2>
+    <div class="card"><label class="field"><span>Set</span><select id="anySet"><option value="">– Set wählen –</option>
+      ${sets.map((s) => `<option value="${esc(s.id)}">${esc(s.nameDe || s.nameEn)}${s.releaseDate ? ' (' + s.releaseDate.slice(0, 4) + ')' : ''}</option>`).join('')}</select></label></div>`;
+  $('#anySet').onchange = (e) => { if (e.target.value) location.hash = '#/set/' + encodeURIComponent(e.target.value); };
+}
+
+const clUi = { filter: 'all' };
+
+async function renderSet(setId) {
+  const p = await setProgress(setId);
+  if (location.hash !== '#/set/' + encodeURIComponent(setId)) return;
+  if (!p.total) {
+    app.innerHTML = `<div class="row" style="margin-bottom:8px"><a href="#/sets" class="btn small">← Set-Listen</a></div>
+      <div class="empty">Für dieses Set ist keine Kartenliste im Katalog vorhanden.</div>`;
+    return;
+  }
+  const { set, cards, st, has } = p;
+  const list = cards.filter((c) => clUi.filter === 'all' || (clUi.filter === 'missing' ? !has(c) : has(c)));
+  app.innerHTML = `
+    <div class="row" style="margin-bottom:8px"><a href="#/sets" class="btn small">← Set-Listen</a><a href="#/" class="btn small">Übersicht</a></div>
+    <h1>${esc(setTitle(set, setId))}</h1>
+    <div class="muted">${[set?.serie, set?.releaseDate ? 'erschienen ' + dateDe(set.releaseDate) : '', p.lang === 'en' ? 'Kartenliste auf Englisch' : ''].filter(Boolean).map(esc).join(' · ')}</div>
+    <div class="stats" style="margin-top:12px">
+      <div class="stat"><b>${p.have} / ${p.total}</b><span>Karten vorhanden</span></div>
+      <div class="stat"><b>${p.missing}</b><span>${p.missing === 1 ? 'Karte fehlt' : 'Karten fehlen'}</span></div>
+      ${p.mainTotal && p.mainTotal < p.total ? `<div class="stat"><b>${p.mainMissing}</b><span>fehlen im Hauptset (1–${set.official})</span></div>
+        <div class="stat"><b>${p.missing - p.mainMissing}</b><span>fehlen bei Secret Rares (ab ${set.official + 1})</span></div>` : ''}
+    </div>
+    ${progressBar(p.have, p.total)}
+    <div class="row" style="margin:12px 0">
+      <div class="seg" id="clSeg">${[['all', 'Alle'], ['missing', `Fehlende (${p.missing})`], ['have', `Vorhanden (${p.have})`]]
+        .map(([v, l]) => `<button data-v="${v}" class="${clUi.filter === v ? 'on' : ''}">${l}</button>`).join('')}</div>
+      <button class="btn small" id="clCopy" ${p.missing ? '' : 'disabled'}>Fehlliste kopieren</button>
+    </div>
+    <p class="muted small">✓ grün = in deiner Sammlung (automatisch). Karte antippen, um sie von Hand als vorhanden zu markieren oder die Markierung zu entfernen. „＋ Sammlung“ legt die Karte mit allen Daten an.</p>
+    <div class="cl-grid">${list.map((c) => {
+      const s = st[c.id];
+      const cls = s.owned ? 'owned' : s.marked ? 'marked' : 'missing';
+      const item = s.items.find((x) => !x.wishlist) || s.items[0];
+      return `<div class="cl-card ${cls}" data-card="${esc(c.id)}">
+        <button class="cl-img" data-toggle="${esc(c.id)}" ${s.owned ? 'disabled' : ''} aria-label="${esc(c.name)} markieren">
+          ${c.image ? `<img src="${esc(c.image)}/low.webp" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'noimg',textContent:'🃏'}))">` : '<div class="noimg">🃏</div>'}
+          <span class="cl-mark">${s.owned || s.marked ? '✓' : ''}</span>
+        </button>
+        <b>${esc(c.name)}</b>
+        <span>Nr. ${esc(c.localId)}${set?.official ? '/' + set.official : ''}</span>
+        <div class="badges">${s.owned ? '<span class="badge ok">in Sammlung</span>' : s.marked ? '<span class="badge ok">markiert</span>' : '<span class="badge red">fehlt</span>'}${s.wish ? '<span class="badge warn">Wunschliste</span>' : ''}</div>
+        ${item ? `<a class="btn small" href="#/item/${item.id}">Öffnen</a>` : `<button class="btn small" data-add="${esc(c.id)}">＋ Sammlung</button>`}
+      </div>`;
+    }).join('') || '<p class="muted">Keine Karten in dieser Auswahl.</p>'}</div>`;
+
+  $$('#clSeg button').forEach((b) => (b.onclick = () => { clUi.filter = b.dataset.v; renderSet(setId); }));
+  $$('[data-toggle]').forEach((b) => (b.onclick = () => data.toggleChecklistMark(setId, b.dataset.toggle)));
+  $$('[data-add]').forEach((b) => (b.onclick = () => createCard({ tcgdexId: b.dataset.add })));
+  $('#clCopy').onclick = async () => {
+    const text = `${setTitle(set, setId)}: ${p.missing} fehlende Karten\n` + cards.filter((c) => !has(c)).map((c) => `${c.localId}${set?.official ? '/' + set.official : ''} ${c.name}`).join('\n');
+    try { await navigator.clipboard.writeText(text); toast('Fehlliste kopiert.'); } catch { toast('Kopieren nicht möglich.'); }
+  };
 }
 
 // ---------- Fotos ----------
@@ -852,6 +985,8 @@ function route() {
   window.scrollTo(0, 0);
   if (h.startsWith('#/item/')) renderItem(h.slice(7));
   else if (h === '#/neu') renderNew();
+  else if (h === '#/sets') renderSets();
+  else if (h.startsWith('#/set/')) renderSet(decodeURIComponent(h.slice(6)));
   else if (h === '#/einstellungen') renderSettings();
   else renderList();
 }
@@ -863,6 +998,7 @@ data.onChange(() => {
   rerenderTimer = setTimeout(() => {
     const h = location.hash || '#/';
     if ((h === '#/' || h === '') && document.activeElement?.id !== 'q') renderList();
+    else if (h.startsWith('#/set/')) renderSet(decodeURIComponent(h.slice(6)));
   }, 200);
 });
 

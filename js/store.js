@@ -138,6 +138,12 @@ export function merge(a, b) {
     if (out.deleted[id] && out.deleted[id] >= pick.updatedAt) continue;
     out.sets[id] = pick;
   }
+  // Set-Checklisten (von Hand markierte Karten): pro Set gewinnt der neuere Stand
+  const ca = a.checklists || {}, cb = b.checklists || {};
+  for (const sid of new Set([...Object.keys(ca), ...Object.keys(cb)])) {
+    const x = ca[sid], y = cb[sid];
+    (out.checklists ||= {})[sid] = !x ? y : !y ? x : (x.updatedAt >= y.updatedAt ? x : y);
+  }
   const sa = a.settings, sb = b.settings;
   if (sa || sb) out.settings = !sa ? sb : !sb ? sa : (sa.updatedAt >= sb.updatedAt ? sa : sb);
   out.updatedAt = a.updatedAt > b.updatedAt ? a.updatedAt : b.updatedAt;

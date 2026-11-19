@@ -30,3 +30,23 @@
 .cm-hit { text-align: left; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font: inherit; color: var(--text); cursor: pointer; }
 .cm-hit span { display: block; font-size: 12px; color: var(--muted); }
 .cm-hit.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+
+/* Set-Checklisten */
+.toolbar { grid-template-columns: 1fr auto auto auto; }
+@media (max-width: 600px) { .toolbar { grid-template-columns: 1fr 1fr; } }
+.progress { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; margin-top: 6px; }
+.progress > div { height: 100%; background: var(--ok); border-radius: 99px; }
+.cl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+.cl-card { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px; }
+.cl-card b { font-size: 14px; line-height: 1.2; }
+.cl-card > span { font-size: 12px; color: var(--muted); }
+.cl-card .btn { margin-top: auto; width: 100%; }
+.cl-card .badges { justify-content: center; margin-top: 0; }
+.cl-img { position: relative; width: 100%; padding: 0; border: 0; background: none; cursor: pointer; }
+.cl-img:disabled { cursor: default; }
+.cl-img img, .cl-img .noimg { width: 100%; aspect-ratio: 245 / 342; object-fit: contain; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 36px; background: var(--bg); }
+.cl-card.missing .cl-img img { filter: grayscale(1); opacity: .45; }
+.cl-card.owned { border-color: var(--ok); }
+.cl-card.marked { border-color: var(--ok); border-style: dashed; }
+.cl-mark { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; background: rgba(0,0,0,.35); border: 2px solid #fff; }
+.cl-card.owned .cl-mark, .cl-card.marked .cl-mark { background: var(--ok); }
