@@ -136,6 +136,23 @@ export function cardmarketPrices(cm) {
   return { id: cm.idProduct || null, updated: (cm.updated || '').slice(0, 10), normal: has(normal) ? normal : null, holo: has(holo) ? holo : null };
 }
 
+// Plausibilitätsprüfung: TCGdex verknüpft gelegentlich die falsche Cardmarket-Karte, z. B. bei einer
+// Illustration Rare die gewöhnliche Karte gleichen Namens aus demselben Set (dann kostet sie nur Cent).
+const HIGH_RARITY = /illustration|special|hyper|ultra|secret|geheim|gold|rainbow|regenbogen|shiny|schillernd|full art|crown|krone/i;
+function usdMarket(tp) {
+  const vals = Object.values(tp || {}).map((v) => (v && typeof v === 'object' ? v.marketPrice ?? v.midPrice : null)).filter((v) => typeof v === 'number' && v > 0);
+  return vals.length ? Math.max(...vals) : null;
+}
+export function priceCheck(result, rarity, tcgplayer) {
+  const value = result.cmPrices?.normal?.trend ?? result.cmPrices?.holo?.trend ?? result.marketValue;
+  if (value == null) return '';
+  const best = Math.max(value, result.cmPrices?.holo?.trend || 0, result.cmPrices?.normal?.avg30 || 0, result.cmPrices?.holo?.avg30 || 0);
+  if (HIGH_RARITY.test(rarity || '') && best < 0.5) return `Cardmarket-Preis ${best.toLocaleString('de-DE')} € passt nicht zur Seltenheit „${rarity}“, vermutlich ist bei TCGdex die falsche Karte verknüpft`;
+  const usd = usdMarket(tcgplayer);
+  if (usd != null && usd >= 2 && best * 4 < usd) return `Cardmarket-Preis ${best.toLocaleString('de-DE')} € weicht stark vom US-Marktpreis (${usd.toLocaleString('de-DE')} $) ab, vermutlich ist bei TCGdex die falsche Karte verknüpft`;
+  return '';
+}
+
 export async function lookupCard(tcgdexId, language = 'Deutsch') {
   const c = await catalog();
   const sid = tcgdexId.replace(/-[^-]+$/, '');
@@ -171,6 +188,7 @@ export async function lookupCard(tcgdexId, language = 'Deutsch') {
     }
     if (cm) {
       result.cmPrices = cardmarketPrices(cm);
+      result.priceWarning = priceCheck(result, card.rarity, card.pricing?.tcgplayer);
       result.marketValue = price(cm.trend) ?? price(cm.avg30) ?? price(cm.avg) ?? price(cm['trend-holo']) ?? price(cm['avg30-holo']);
       result.marketValueHolo = price(cm['trend-holo']) ?? price(cm['avg30-holo']);
       result.marketUpdated = (cm.updated || '').slice(0, 10);
@@ -223,7 +241,14 @@ export async function enrich(item, { overwrite = false } = {}) {
       const { result, sources: src, error } = await lookupCard(item.tcgdexId, item.language);
       if (result.name) result.pokemon = pokemonFromName(result.name, result.category);
       apply(result, CARD_FIELDS, overwrite);
-      apply(result, PRICE_FIELDS, true);
+      if (result.priceWarning) {
+        // unplausiblen Preis nicht als Marktwert übernehmen; Tabelle zeigt ihn mit Warnhinweis
+        item.cmPrices = { ...result.cmPrices, warning: result.priceWarning };
+        if (!item.marketManual) { item.marketValue = null; item.marketValueHolo = null; item.marketUpdated = ''; }
+        notes.push(result.priceWarning + (item.marketManual ? '; dein eigener Marktwert bleibt' : '; bitte Marktwert bei Cardmarket nachsehen und selbst eintragen'));
+      } else if (item.marketManual) {
+        if (result.cmPrices) item.cmPrices = result.cmPrices;
+      } else apply(result, PRICE_FIELDS, true);
       sources = src;
       if (error) notes.push(error + ', Marktwert nicht aktualisiert');
       else if (src.includes('TCGdex') && result.marketValue == null) notes.push('kein Cardmarket-Preis');
@@ -255,7 +280,7 @@ export async function enrich(item, { overwrite = false } = {}) {
     if (!item.uvp) notes.push('UVP bitte von Hand eintragen');
   }
   if (!item.year) notes.push('Erscheinungsjahr nicht gefunden');
-  const complete = item.kind === 'karte' ? !!(item.year && item.name && item.setName) : !!(item.year && item.uvp && item.cmId);
+  const complete = item.kind === 'karte' ? !!(item.year && item.name && item.setName && !item.cmPrices?.warning) : !!(item.year && item.uvp && item.cmId);
   item.research = {
     status: !sources.length ? 'notfound' : complete ? 'ok' : 'partial',
     source: sources.join(' + ') || '–',
@@ -378,6 +403,7 @@ export async function lookupProduct(id) {
 
 export function cardmarketUrl(item) {
   if (item.cmName) return 'https://www.cardmarket.com/de/Pokemon/Products/Search?searchString=' + encodeURIComponent(item.cmName);
-  const q = item.kind === 'karte' ? [item.name, item.setName, item.number].filter(Boolean).join(' ') : [item.name || item.productType, item.setName].filter(Boolean).join(' ');
+  // Cardmarket findet Karten nur über den Namen; Set und Nummer würden die Suche leer machen
+  const q = item.kind === 'karte' ? item.name || '' : [item.name || item.productType, item.setName].filter(Boolean).join(' ');
   return 'https://www.cardmarket.com/de/Pokemon/Products/Search?searchString=' + encodeURIComponent(q);
 }
