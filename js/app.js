@@ -340,6 +340,22 @@ function select(label, name, list, value, attr = 'data-f') {
   return `<label class="field"><span>${label}</span><select ${attr}="${name}">${opts(all, value || '', '–')}</select></label>`;
 }
 
+// Cardmarket-Preise einer Einzelkarte: Ab-Preis, Trend und Durchschnitte, getrennt nach normal und Holo/Reverse
+function cardmarketBox(s) {
+  const p = s.cmPrices;
+  if (!p || (!p.normal && !p.holo)) {
+    return `<h2>Wert bei Cardmarket</h2><div class="card"><p class="small muted">Noch keine Cardmarket-Preise für diese Karte. Tippe auf „Daten &amp; Marktwert aktualisieren“, um sie abzurufen.</p></div>`;
+  }
+  const cols = [['normal', 'Normal'], ['holo', 'Holo / Reverse']].filter(([k]) => p[k]);
+  const rows = [['low', 'Ab-Preis'], ['trend', 'Preistrend'], ['avg30', 'Ø 30 Tage'], ['avg7', 'Ø 7 Tage'], ['avg1', 'Ø 1 Tag']]
+    .filter(([k]) => cols.some(([c]) => p[c][k] != null));
+  return `<h2>Wert bei Cardmarket</h2><div class="card">
+    <table class="prices"><thead><tr><th></th>${cols.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(([k, l]) => `<tr${k === 'trend' ? ' class="main"' : ''}><td>${l}</td>${cols.map(([c]) => `<td>${eur(p[c][k])}</td>`).join('')}</tr>`).join('')}</tbody></table>
+    <p class="small muted" style="margin-top:8px">Als Marktwert zählt der Preistrend${p.holo && p.normal ? ' (für Exemplare mit Variante Holo, Reverse oder Ball der Holo-Wert)' : ''}.${p.updated ? ' Preisstand ' + dateDe(p.updated) + '.' : ''} Quelle: Cardmarket über TCGdex.</p>
+  </div>`;
+}
+
 const NUM_FIELDS = ['year', 'uvp', 'marketValue', 'setTotal', 'hp'];
 
 function renderItem(id) {
@@ -371,6 +387,7 @@ function renderItem(id) {
       </div>
     </div>
 
+    ${card ? cardmarketBox(s) : ''}
     <h2>${card ? 'Kartendaten' : 'Produktdaten'}</h2>
     <div class="card"><div class="grid">
       ${field('Name', 'name', s.name)}

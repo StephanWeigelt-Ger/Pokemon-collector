@@ -126,6 +126,16 @@ async function api(lang, path) {
 const TYPES_DE = { Grass: 'Pflanze', Fire: 'Feuer', Water: 'Wasser', Lightning: 'Elektro', Psychic: 'Psycho', Fighting: 'Kampf', Darkness: 'Finsternis', Metal: 'Metall', Dragon: 'Drache', Fairy: 'Fee', Colorless: 'Farblos' };
 const CAT_DE = { Pokemon: 'Pokémon', 'Pokémon': 'Pokémon', Trainer: 'Trainer', Energy: 'Energie' };
 
+// Cardmarket-Preise einer Einzelkarte (über TCGdex, täglich aktualisiert): normale Version und Holo/Reverse-Holo
+const price = (v) => (typeof v === 'number' && v > 0 ? Math.round(v * 100) / 100 : null);
+export function cardmarketPrices(cm) {
+  const pick = (suffix) => ({ low: price(cm['low' + suffix]), trend: price(cm['trend' + suffix]), avg1: price(cm['avg1' + suffix]),
+    avg7: price(cm['avg7' + suffix]), avg30: price(cm['avg30' + suffix]) });
+  const has = (o) => Object.values(o).some((v) => v != null);
+  const normal = pick(''), holo = pick('-holo');
+  return { id: cm.idProduct || null, updated: (cm.updated || '').slice(0, 10), normal: has(normal) ? normal : null, holo: has(holo) ? holo : null };
+}
+
 export async function lookupCard(tcgdexId, language = 'Deutsch') {
   const c = await catalog();
   const sid = tcgdexId.replace(/-[^-]+$/, '');
@@ -154,10 +164,15 @@ export async function lookupCard(tcgdexId, language = 'Deutsch') {
       illustrator: card.illustrator || '',
       imageUrl: card.image ? card.image + '/high.webp' : '',
     });
-    const cm = card.pricing?.cardmarket;
+    let cm = card.pricing?.cardmarket;
+    // Manche Sprachversionen liefern keine Preise: dann die englische Fassung derselben Karte fragen
+    if (!cm && card.lang !== 'en') {
+      try { cm = (await api('en', 'cards/' + encodeURIComponent(tcgdexId)))?.pricing?.cardmarket; } catch { /* egal */ }
+    }
     if (cm) {
-      result.marketValue = cm.trend ?? cm.avg30 ?? cm.avg ?? null;
-      result.marketValueHolo = cm['trend-holo'] ?? cm['avg30-holo'] ?? null;
+      result.cmPrices = cardmarketPrices(cm);
+      result.marketValue = price(cm.trend) ?? price(cm.avg30) ?? price(cm.avg) ?? price(cm['trend-holo']) ?? price(cm['avg30-holo']);
+      result.marketValueHolo = price(cm['trend-holo']) ?? price(cm['avg30-holo']);
       result.marketUpdated = (cm.updated || '').slice(0, 10);
     }
     if (!result.releaseDate && result.setId) {
@@ -185,7 +200,7 @@ export async function lookupProductSet(setName) {
 }
 
 const CARD_FIELDS = ['name', 'pokemon', 'number', 'setId', 'setName', 'serie', 'setTotal', 'rarity', 'category', 'types', 'hp', 'illustrator', 'imageUrl', 'releaseDate', 'year', 'tcgdexId'];
-const PRICE_FIELDS = ['marketValue', 'marketValueHolo', 'marketUpdated'];
+const PRICE_FIELDS = ['marketValue', 'marketValueHolo', 'marketUpdated', 'cmPrices'];
 
 // Ergänzt fehlende Felder (eigene Eingaben bleiben erhalten, außer overwrite = true).
 // Der Marktwert wird immer aktualisiert, wenn TCGdex einen liefert.
