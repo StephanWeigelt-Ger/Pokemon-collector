@@ -39,7 +39,7 @@ function toast(msg, ms = 2800) {
 const isCard = (s) => s.kind === 'karte';
 function activeCopies(s) { return s.copies.filter((c) => !c.soldDate && c.soldPrice === null); }
 function copyValue(s, c) {
-  if (isCard(s) && s.marketValueHolo && /holo|reverse|ball/i.test(c.variant || '') && !/^holo$/i.test(s.rarity || '')) return s.marketValueHolo;
+  if (isCard(s) && !s.marketManual && s.marketValueHolo && /holo|reverse|ball/i.test(c.variant || '') && !/^holo$/i.test(s.rarity || '')) return s.marketValueHolo;
   return s.marketValue || 0;
 }
 // Titelbild: selbst gewähltes Foto, sonst das automatisch gefundene Bild, sonst das erste eigene Foto
@@ -340,6 +340,24 @@ function select(label, name, list, value, attr = 'data-f') {
   return `<label class="field"><span>${label}</span><select ${attr}="${name}">${opts(all, value || '', '–')}</select></label>`;
 }
 
+// Cardmarket-Preise einer Einzelkarte: Ab-Preis, Trend und Durchschnitte, getrennt nach normal und Holo/Reverse
+function cardmarketBox(s) {
+  const p = s.cmPrices;
+  const manual = s.marketManual ? `<p class="small" style="margin-top:8px">Dein selbst eingetragener Marktwert (${eur(s.marketValue)}) gilt und wird bei Aktualisierungen nicht überschrieben. Leere das Feld „Marktwert aktuell“, um wieder den Cardmarket-Preis zu verwenden.</p>` : '';
+  const warn = p?.warning ? `<p class="small" style="color:var(--warn);margin-bottom:8px">⚠️ ${esc(p.warning)}. Die Werte unten gehören daher wohl zu einer anderen Karte. Öffne die Karte über „Cardmarket ↗“ und trage den Preistrend selbst bei „Marktwert aktuell“ ein.</p>` : '';
+  if (!p || (!p.normal && !p.holo)) {
+    return `<h2>Wert bei Cardmarket</h2><div class="card"><p class="small muted">Noch keine Cardmarket-Preise für diese Karte. Tippe auf „Daten &amp; Marktwert aktualisieren“, um sie abzurufen.</p>${manual}</div>`;
+  }
+  const cols = [['normal', 'Normal'], ['holo', 'Holo / Reverse']].filter(([k]) => p[k]);
+  const rows = [['low', 'Ab-Preis'], ['trend', 'Preistrend'], ['avg30', 'Ø 30 Tage'], ['avg7', 'Ø 7 Tage'], ['avg1', 'Ø 1 Tag']]
+    .filter(([k]) => cols.some(([c]) => p[c][k] != null));
+  return `<h2>Wert bei Cardmarket</h2><div class="card">${warn}
+    <table class="prices"><thead><tr><th></th>${cols.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(([k, l]) => `<tr${k === 'trend' ? ' class="main"' : ''}><td>${l}</td>${cols.map(([c]) => `<td>${eur(p[c][k])}</td>`).join('')}</tr>`).join('')}</tbody></table>
+    <p class="small muted" style="margin-top:8px">Als Marktwert zählt der Preistrend${p.holo && p.normal ? ' (für Exemplare mit Variante Holo, Reverse oder Ball der Holo-Wert)' : ''}.${p.updated ? ' Preisstand ' + dateDe(p.updated) + '.' : ''} Quelle: Cardmarket über TCGdex.</p>${manual}
+  </div>`;
+}
+
 const NUM_FIELDS = ['year', 'uvp', 'marketValue', 'setTotal', 'hp'];
 
 function renderItem(id) {
@@ -358,7 +376,8 @@ function renderItem(id) {
         <div class="muted">${(card ? [s.setName, numberLabel(s), s.rarity, s.language] : [s.productType, s.setName, s.language]).filter(Boolean).map(esc).join(' · ')}</div>
         <div class="badges" style="margin-top:8px">
           ${s.releaseDate ? `<span class="badge">erschienen ${dateDe(s.releaseDate)}</span>` : s.year ? `<span class="badge">erschienen ${s.year}</span>` : '<span class="badge warn">Erscheinungsjahr fehlt</span>'}
-          ${s.marketValue ? `<span class="badge ok">Marktwert ${eur(s.marketValue)}${s.marketValueHolo ? ' · Holo/Reverse ' + eur(s.marketValueHolo) : ''}</span>` : ''}
+          ${s.marketValue ? `<span class="badge ok">Marktwert ${eur(s.marketValue)}${s.marketManual ? ' (selbst eingetragen)' : s.marketValueHolo ? ' · Holo/Reverse ' + eur(s.marketValueHolo) : ''}</span>` : ''}
+          ${card && s.cmPrices?.warning && !s.marketManual ? '<span class="badge warn">Marktwert prüfen</span>' : ''}
           ${!card ? (s.uvp ? `<span class="badge">UVP ${eur(s.uvp)}</span>` : '<span class="badge warn">UVP fehlt</span>') : ''}
           ${s.wishlist ? '<span class="badge warn">Wunschliste</span>' : ''}
         </div>
@@ -371,6 +390,7 @@ function renderItem(id) {
       </div>
     </div>
 
+    ${card ? cardmarketBox(s) : ''}
     <h2>${card ? 'Kartendaten' : 'Produktdaten'}</h2>
     <div class="card"><div class="grid">
       ${field('Name', 'name', s.name)}
@@ -430,6 +450,7 @@ function renderItem(id) {
       const idChanged = card && ['setName', 'number', 'language'].includes(f) && v !== s[f];
       s[f] = v;
       if (f === 'releaseDate' && v) s.year = Number(v.slice(0, 4));
+      if (f === 'marketValue') s.marketManual = v != null; // eigener Wert wird bei Aktualisierungen nicht überschrieben
       if (idChanged && f !== 'language') { s.tcgdexId = ''; s.setId = f === 'setName' ? '' : s.setId; }
       await data.save(s);
       if (idChanged && s.number && (s.setName || s.setId)) { autoResearch(id, f !== 'language'); return; }
