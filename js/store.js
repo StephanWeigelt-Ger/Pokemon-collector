@@ -85,6 +85,7 @@ export function newSet(fields = {}) {
     uvp: null,         // UVP Deutschland in Euro (v. a. Produkte)
     marketValue: null, // Marktwert in Euro (Cardmarket-Trend bei Karten)
     marketUpdated: '',
+    marketManual: false, // Marktwert selbst eingetragen: wird bei Aktualisierungen nicht überschrieben
     imageUrl: '',
     wishlist: false,
     notes: '',
