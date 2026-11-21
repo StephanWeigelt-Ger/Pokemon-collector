@@ -109,6 +109,7 @@ img.thumb { object-fit: contain; background: #fff; }
 .badge { font-size: 12px; padding: 2px 7px; border-radius: 99px; background: var(--bg); border: 1px solid var(--line); white-space: nowrap; }
 .badge.ok { color: var(--ok); }
 .badge.warn { color: var(--warn); }
+.badge.manual { color: var(--accent); }
 .badge.red { color: var(--accent); }
 
 /* Detail */

@@ -264,8 +264,8 @@ export async function enrich(item, { overwrite = false } = {}) {
       if (p) {
         sources.push('Cardmarket');
         const v = p.trend ?? p.avg30 ?? null;
-        if (v != null) { item.marketValue = v; item.marketUpdated = (p.stand || '').slice(0, 10); }
-        else notes.push('kein Cardmarket-Preis');
+        if (v != null && !item.marketManual) { item.marketValue = v; item.marketUpdated = (p.stand || '').slice(0, 10); }
+        else if (v == null) notes.push('kein Cardmarket-Preis');
         if (p.image && (!item.imageUrl || item.imageAuto)) { item.imageUrl = p.image; item.imageAuto = true; }
       }
     } else notes.push('kein passendes Cardmarket-Produkt gefunden');
@@ -280,7 +280,7 @@ export async function enrich(item, { overwrite = false } = {}) {
     if (!item.uvp) notes.push('UVP bitte von Hand eintragen');
   }
   if (!item.year) notes.push('Erscheinungsjahr nicht gefunden');
-  const complete = item.kind === 'karte' ? !!(item.year && item.name && item.setName && !item.cmPrices?.warning) : !!(item.year && item.uvp && item.cmId);
+  const complete = item.kind === 'karte' ? !!(item.year && item.name && item.setName && !(item.cmPrices?.warning && !item.marketManual)) : !!(item.year && item.uvp && item.cmId);
   item.research = {
     status: !sources.length ? 'notfound' : complete ? 'ok' : 'partial',
     source: sources.join(' + ') || '–',

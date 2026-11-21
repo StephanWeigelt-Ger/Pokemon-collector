@@ -159,12 +159,13 @@ function itemRow(s) {
     ${img ? `<img class="thumb" src="${esc(img)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : `<div class="thumb">${isCard(s) ? '🃏' : '📦'}</div>`}
     <div>
       <div class="title">${esc(title(s))}</div>
-      <div class="meta">${meta.map(esc).join(' · ')}${s.marketValue ? ' · Wert ' + eur(s.marketValue) : ''}</div>
+      <div class="meta">${meta.map(esc).join(' · ')}${s.marketValue ? ' · Wert ' + eur(s.marketValue) + (s.marketManual ? ' ✎' : '') : ''}</div>
       <div class="badges">
         ${s.wishlist ? '<span class="badge warn">Wunschliste</span>' : `<span class="badge">${act.length}× vorhanden</span>`}
         ${graded.map((g) => `<span class="badge ok">${esc(g)}</span>`).join('')}
         ${conds.length ? `<span class="badge">Zustand ${conds.join(' / ')}</span>` : ''}
         ${!isCard(s) && act.some((c) => c.state === 'versiegelt') ? '<span class="badge">versiegelt</span>' : ''}
+        ${s.marketManual && s.marketValue ? '<span class="badge manual" title="Selbst eingetragen, wird bei Aktualisierungen nicht überschrieben">✎ Marktwert manuell</span>' : ''}
         ${s.research && s.research.status !== 'ok' ? '<span class="badge warn">Daten fehlen</span>' : ''}
       </div>
     </div>
@@ -376,7 +377,7 @@ function renderItem(id) {
         <div class="muted">${(card ? [s.setName, numberLabel(s), s.rarity, s.language] : [s.productType, s.setName, s.language]).filter(Boolean).map(esc).join(' · ')}</div>
         <div class="badges" style="margin-top:8px">
           ${s.releaseDate ? `<span class="badge">erschienen ${dateDe(s.releaseDate)}</span>` : s.year ? `<span class="badge">erschienen ${s.year}</span>` : '<span class="badge warn">Erscheinungsjahr fehlt</span>'}
-          ${s.marketValue ? `<span class="badge ok">Marktwert ${eur(s.marketValue)}${s.marketManual ? ' (selbst eingetragen)' : s.marketValueHolo ? ' · Holo/Reverse ' + eur(s.marketValueHolo) : ''}</span>` : ''}
+          ${s.marketValue ? `<span class="badge ok">Marktwert ${eur(s.marketValue)}${s.marketManual ? ' · ✎ manuell eingetragen' : s.marketValueHolo ? ' · Holo/Reverse ' + eur(s.marketValueHolo) : ''}</span>` : ''}
           ${card && s.cmPrices?.warning && !s.marketManual ? '<span class="badge warn">Marktwert prüfen</span>' : ''}
           ${!card ? (s.uvp ? `<span class="badge">UVP ${eur(s.uvp)}</span>` : '<span class="badge warn">UVP fehlt</span>') : ''}
           ${s.wishlist ? '<span class="badge warn">Wunschliste</span>' : ''}
@@ -413,7 +414,7 @@ function renderItem(id) {
       ${field('Serie', 'serie', s.serie)}
       ${field('Erscheinungsdatum', 'releaseDate', s.releaseDate, 'date')}
       ${field('Erscheinungsjahr', 'year', s.year, 'number', 'inputmode="numeric"')}
-      ${field('Marktwert aktuell (€)', 'marketValue', s.marketValue, 'number', 'step="0.01" inputmode="decimal"')}
+      ${field(s.marketManual ? 'Marktwert aktuell (€) · ✎ manuell, bleibt stehen' : 'Marktwert aktuell (€)', 'marketValue', s.marketValue, 'number', 'step="0.01" inputmode="decimal"')}
       <label class="check"><input type="checkbox" data-f="wishlist" ${s.wishlist ? 'checked' : ''}> Wunschliste</label>
     </div>
     ${!card ? `<div style="margin-top:12px"><p class="small">${s.cmId ? `Cardmarket-Produkt${s.cmAuto ? ' (automatisch gefunden)' : ''}: <b>${esc(s.cmName)}</b> <button class="btn small" id="cmChange">falsch? ändern</button>` : '⚠️ Kein passendes Cardmarket-Produkt gefunden. <button class="btn small" id="cmChange">selbst auswählen</button>'}</p><div id="cmBox"></div></div>` : ''}
